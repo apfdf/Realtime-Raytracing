@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/mans/Documents/programming/Realtime-Raytracing/build",
+  "command": "/usr/bin/g++   -g -o CMakeFiles/Realtime-Raytracing.dir/main.cpp.o -c /home/mans/Documents/programming/Realtime-Raytracing/main.cpp",
+  "file": "/home/mans/Documents/programming/Realtime-Raytracing/main.cpp"
+}
+]
