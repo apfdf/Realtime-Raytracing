@@ -26,13 +26,19 @@ int main(int, char**){
     glm::vec3 p = {0.0f, 0.0f, 0.0f};
     float y_rot = 0.0f;
     float x_rot = 0.0f;
-    float fov = glm::radians(100);
+    float fov = glm::radians(100.0f);
 
     // triangles (won't be using indices for now)
     std::vector<glm::vec3> vertices = {
+        
         {1.0f, 1.0f, 1.0f},
         {0.5f, 0.5f, 1.0f},
-        {0.75f, 1.0f, 0.5f}
+        {0.75f, 1.0f, 0.5f},
+
+        {3.0f, 0.0f, 1.0f},
+        {1.0f, 1.0f, 1.5f},
+        {0.75f, 0.0f, 2.0f}
+
     };
 
     // light sources
@@ -44,70 +50,112 @@ int main(int, char**){
     int max_ray_dist = 100.0f;
     float z0 = 0.5f / glm::tan(fov/2);
 
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    
+    float dt = 0.0f;
+
     bool running = true;
     SDL_Event ev;
     while (running) {
 
+        int start_time = SDL_GetTicks();
+
         while (SDL_PollEvent(&ev)) {
             switch (ev.type) {
+                
                 case SDL_QUIT:
                     running = false;
+                
+                case SDL_KEYDOWN:
+                    switch (ev.key.keysym.sym) {
+                        case SDLK_LEFT:
+                            y_rot -= dt;
+                        case SDLK_RIGHT:
+                            y_rot += dt;
+                        case SDLK_UP:
+                            x_rot -= dt;
+                        case SDLK_DOWN:
+                            x_rot += dt;
+                    }
+
             }
         }
 
-        glm::mat4 rot_mat(0.0f);
+        // clear pixel buffer
+        for (int i = 0; i < wth*wtw; i++) {
+            
+            pixels[i*4] = 0;
+            pixels[i*4 + 1] = 0;
+            pixels[i*4 + 2] = 0;
+            pixels[i*4 + 3] = SDL_ALPHA_OPAQUE;
+
+        }
+
+        glm::mat4 rot_mat(1.0f);
         rot_mat = glm::rotate(rot_mat, y_rot, glm::vec3(0.0f, 1.0f, 0.0f));
         rot_mat = glm::rotate(rot_mat, x_rot, glm::vec3(1.0f, 0.0f, 0.0f));
 
         for (int i = 0; i < wth; i++) {
             for (int j = 0; j < wtw; j++) {
                 
-                glm::vec3 start_pos = glm::vec3(j/wtw-0.5f - p.x, i/wth-0.5f, z0);
-                glm::vec3 norm_vec = (rot_mat * glm::vec4(glm::normalize(start_pos - p), 0.0f));
-
-                glm::vec3 p1 = start_pos;
-                glm::vec3 p2 = start_pos;
+                glm::vec3 start_pos = glm::vec3((float)j/wtw-0.5f - p.x, (float)i/wth-0.5f, z0);
+                glm::vec3 angled_vec = rot_mat * glm::vec4(glm::normalize(start_pos), 0.0f);
 
                 bool stopped = false;
 
-                // kolla
+                float lowest_dist = max_ray_dist;
 
-                /*
-                int steps = 0;
-                while (steps < max_steps && (!stopped)) {
+                for (int ti = 0; ti < vertices.size(); ti+=3) {
 
-                    p1 = p2;
-                    p2 += step_vec;
+                    glm::vec3 normal = glm::normalize(glm::cross(vertices[ti+1] - vertices[ti], vertices[ti+2] - vertices[ti]));
+                    glm::vec3 plane_point = vertices[ti] - p;
+                    // verkar bli fel med denna
+                    // antar att det kan vara fel med att angled_vec går från p och inte origo
 
-                    // check if the line between p1 and p2 intersects with any triangle
-                    for (int ti = 0; ti < vertices.size()/3; ti += 3) {
-                        
-                        // borde räkna ut surface matriserna innan detta så att det endast behövs göras en gång
+                    // angled_vec verkar orsaka felet
+                    
+                    //std::cout << "angled vec: " << angled_vec.x << " " << angled_vec.y << " " << angled_vec.z << std::endl;
 
-                        // los computaciones caros
-                        glm::vec3 axis1 = vertices[ti] - vertices[ti+1];
-                        glm::vec3 normal = glm::cross(axis1, vertices[ti] - vertices[ti+2]);
-                        glm::vec3 axis2 = glm::cross(axis1, axis2);
+                    float d = (normal.x*plane_point.x + normal.y*plane_point.y + normal.z*plane_point.z) / (normal.x*angled_vec.x + normal.y*angled_vec.y + normal.z*angled_vec.z);
 
-                        glm::mat4 surface_mat = glm::mat4(glm::vec4(normal, 0.0f), glm::vec4(axis1, 0.0f), glm::vec4(axis2, 0.0f), glm::vec4(0.0f));
-                        glm::mat4 surface_inverse = glm::inverse(surface_mat);
+                    if (d > 0.0f && d < lowest_dist) {
 
-                        float triangle_normal_pos = (surface_inverse * glm::vec4(vertices[ti], 0.0f)).x;
+                        // kolla om punkten som går genom planet går genom triangeln
 
-                        float p1_normal_pos = (surface_inverse * glm::vec4(p1, 0.0f)).x;
-                        float p2_normal_pos = (surface_inverse * glm::vec4(p2, 0.0f)).x;
+                        glm::vec3 ray_point = d * angled_vec;
 
-                        if ((triangle_normal_pos - p1_normal_pos < 0) != (triangle_normal_pos - p2_normal_pos)) {
-                            stopped = true;
-                            break;
+                        glm::vec3 A = vertices[ti];
+                        glm::vec3 B = vertices[ti+1];
+                        glm::vec3 C = vertices[ti+2];
+
+                        float triangle_area = glm::length(glm::cross(B - A, C - A)) / 2;
+
+                        float alpha = (glm::length(glm::cross(A - ray_point, B - ray_point)) / 2) / triangle_area;
+                        float beta = (glm::length(glm::cross(B - ray_point, C - ray_point)) / 2) / triangle_area;
+                        float gamma = (glm::length(glm::cross(C - ray_point, A - ray_point)) / 2) / triangle_area;
+
+                        if (alpha >= 0 && beta >= 0 && gamma >= 0 && alpha + beta + gamma > 0.98f && alpha + beta + gamma < 1.02f) {
+
+                            lowest_dist = d;
+                            if (!stopped) {
+                                stopped = true;
+                            }
+
                         }
 
                     }
 
                 }
-                */
 
                 if (stopped) {
+
+                    float inv_sqrt = 1.0f / (lowest_dist*lowest_dist);
+
+                    const unsigned int offset = ( wtw * i * 4 ) + j * 4;
+                    pixels[offset]      = 255 * inv_sqrt;
+                    pixels[offset+1]    = 255 * inv_sqrt;
+                    pixels[offset+2]    = 255 * inv_sqrt;
+                    pixels[offset+3]    = SDL_ALPHA_OPAQUE;
 
                     // do essentially the same process, but from the position where the ray was stopped, to every light source
 
@@ -119,10 +167,15 @@ int main(int, char**){
         }
 
         SDL_UpdateTexture(win_tex, nullptr, pixels.data(), wtw * 4);
+
+        SDL_RenderClear(renderer);
+
         SDL_RenderCopy(renderer, win_tex, nullptr, nullptr);
 
         SDL_RenderPresent(renderer);
-        
+
+        dt = (SDL_GetTicks() - start_time) / 1000.0f;
+
     }
 
 }
