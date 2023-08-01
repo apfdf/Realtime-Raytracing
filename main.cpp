@@ -8,6 +8,15 @@
 
 #include <SDL2/SDL.h>
 
+
+struct mesh {
+
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::vec3> normals;
+
+};
+
+
 int main(int, char**){
 
     // window setup
@@ -48,6 +57,12 @@ int main(int, char**){
         {-4.0f, 2.0f, -4.0f}
 
     };
+    std::vector<glm::vec3> normals(vertices.size()/3);
+    for (int i = 0; i < normals.size(); i++) {
+        normals[i] = glm::normalize(glm::cross(vertices[i*3+1]-vertices[i*3], vertices[i*3+2]-vertices[i*3]));
+    }
+
+    mesh m = {vertices, normals};
 
     // light sources
     std::vector<glm::vec3> light_sources = {
@@ -70,6 +85,10 @@ int main(int, char**){
 
         int start_time = SDL_GetTicks();
 
+        glm::mat4 rot_mat(1.0f);
+        rot_mat = glm::rotate(rot_mat, y_rot, glm::vec3(0.0f, 1.0f, 0.0f));
+        rot_mat = glm::rotate(rot_mat, x_rot, glm::vec3(1.0f, 0.0f, 0.0f));
+
         while (SDL_PollEvent(&ev)) {
             switch (ev.type) {
                 
@@ -78,6 +97,11 @@ int main(int, char**){
                 
                 case SDL_KEYDOWN:
                     switch (ev.key.keysym.sym) {
+
+                        case SDLK_ESCAPE:
+                            running = false;
+                            break;
+
                         case SDLK_LEFT:
                             y_rot -= dt;
                             break;
@@ -90,6 +114,14 @@ int main(int, char**){
                         case SDLK_DOWN:
                             x_rot -= dt;
                             break;
+
+                        case SDLK_SPACE:
+                            p.y -= dt;
+                            break;
+                        case SDLK_LSHIFT:
+                            p.y += dt;
+                            break;
+                        
                     }
 
             }
@@ -105,60 +137,46 @@ int main(int, char**){
 
         }
 
-        glm::mat4 rot_mat(1.0f);
-        rot_mat = glm::rotate(rot_mat, y_rot, glm::vec3(0.0f, 1.0f, 0.0f));
-        rot_mat = glm::rotate(rot_mat, x_rot, glm::vec3(1.0f, 0.0f, 0.0f));
-
         for (int i = 0; i < wth; i++) {
             for (int j = 0; j < wtw; j++) {
 
-                float brightness = ambient_light;
+                glm::vec3 angled_vec = rot_mat * glm::vec4(glm::normalize(glm::vec3((float)j/wtw - 0.5f, (float)i/wth - 0.5f, z0)), 0.0f);
+
+                float lowest_d = max_ray_dist;
+                float lowest_ti;
                 
-                glm::vec3 start_pos = glm::vec3((float)j/wtw-0.5f - p.x, (float)i/wth-0.5f, z0);
-                glm::vec3 angled_vec = rot_mat * glm::vec4(glm::normalize(start_pos), 0.0f);
-
                 bool stopped = false;
-                int stopped_triangle_index = 0;
-
-                float lowest_dist = max_ray_dist;
 
                 for (int ti = 0; ti < vertices.size(); ti+=3) {
+
+                    glm::vec3 normal = normals[ti/3];
                     
-                    glm::vec3 normal = glm::normalize(glm::cross(vertices[ti+1] - vertices[ti], vertices[ti+2] - vertices[ti]));
-                    glm::vec3 plane_point = vertices[ti] - p;
-                    // verkar bli fel med denna
-                    // antar att det kan vara fel med att angled_vec går från p och inte origo
+                    glm::vec3 a = vertices[ti] - p;
+                    glm::vec3 b = vertices[ti+1] - p;
+                    glm::vec3 c = vertices[ti+2] - p;
 
-                    // angled_vec verkar orsaka felet
-                    
-                    //std::cout << "angled vec: " << angled_vec.x << " " << angled_vec.y << " " << angled_vec.z << std::endl;
+                    float d = (normal.x*a.x + normal.y*a.y + normal.z*a.z) / (normal.x*angled_vec.x + normal.y*angled_vec.y + normal.z*angled_vec.z);
 
-                    float d = (normal.x*plane_point.x + normal.y*plane_point.y + normal.z*plane_point.z) / (normal.x*angled_vec.x + normal.y*angled_vec.y + normal.z*angled_vec.z);
+                    if (d > 0.0f && d < lowest_d) {
 
-                    if (d > 0.0f && d < lowest_dist) {
+                        glm::vec3 rp = d * angled_vec;
 
-                        // kolla om punkten som går genom planet går genom triangeln
+                        float t_area = glm::length(glm::cross(b - a, c - a)) / 2;
 
-                        glm::vec3 ray_point = d * angled_vec;
+                        float alpha = (glm::length(glm::cross(a - rp, b - rp)) / 2) / t_area;
+                        float beta = (glm::length(glm::cross(b - rp, c - rp)) / 2) / t_area;
+                        float gamma = (glm::length(glm::cross(c - rp, a - rp)) / 2) / t_area;
 
-                        glm::vec3 A = vertices[ti];
-                        glm::vec3 B = vertices[ti+1];
-                        glm::vec3 C = vertices[ti+2];
+                        float area_sum = alpha + beta + gamma;
 
-                        // kan lagras i normalen
-                        float triangle_area = glm::length(glm::cross(B - A, C - A)) / 2;
+                        if (area_sum > 0.98f && area_sum < 1.02f) {
+                            
+                            std::cout << "test" << std::endl;
 
-                        float alpha = (glm::length(glm::cross(A - ray_point, B - ray_point)) / 2) / triangle_area;
-                        float beta = (glm::length(glm::cross(B - ray_point, C - ray_point)) / 2) / triangle_area;
-                        float gamma = (glm::length(glm::cross(C - ray_point, A - ray_point)) / 2) / triangle_area;
+                            stopped = true;
 
-                        if (alpha >= 0 && beta >= 0 && gamma >= 0 && alpha + beta + gamma > 0.98f && alpha + beta + gamma < 1.02f) {
-
-                            lowest_dist = d;
-                            stopped_triangle_index = ti/3;
-                            if (!stopped) {
-                                stopped = true;
-                            }
+                            lowest_d = d;
+                            lowest_ti = ti;
 
                         }
 
@@ -170,76 +188,16 @@ int main(int, char**){
 
                     for (int li = 0; li < light_sources.size(); li++) {
 
-                        bool reaches = true;
+                    }                    
 
-                        glm::vec3 ttl = light_sources[li] - (p + angled_vec * lowest_dist);
-                        glm::vec3 ttl_normalized = glm::normalize(ttl);
+                    int wi = i*wtw+j;
 
-                        for (int ti = 0; ti < vertices.size()/3; ti++) {
-                            
-                            if (ti != stopped_triangle_index) {
-                                
-                                glm::vec3 A = vertices[ti*3] - p;
-                                glm::vec3 B = vertices[ti*3+1] - p;
-                                glm::vec3 C = vertices[ti*3+2] - p;
-
-                                glm::vec3 normal = glm::normalize(glm::cross(B - A, C - A));
-
-                                float d = (normal.x*A.x + normal.y*A.y + normal.z*A.z) / (normal.x*ttl.x + normal.y*ttl.y + normal.z*ttl.z);
-
-                                if (d >= 0.0f && d <= glm::length(ttl)) {
-
-                                    glm::vec3 ray_point = d * ttl_normalized;
-
-                                    float triangle_area = glm::length(glm::cross(B - A, C - A)) / 2;
-
-                                    float alpha = (glm::length(glm::cross(A - ray_point, B - ray_point)) / 2) / triangle_area;
-                                    float beta = (glm::length(glm::cross(B - ray_point, C - ray_point)) / 2) / triangle_area;
-                                    float gamma = (glm::length(glm::cross(C - ray_point, A - ray_point)) / 2) / triangle_area;
-
-                                    if (alpha >= 0 && beta >= 0 && gamma >= 0 && alpha + beta + gamma > 0.98f && alpha + beta + gamma < 1.02f) {
-                                        //glm::vec3 n = glm::normalize(glm::cross(vertices[stopped_triangle_index*3+1] - vertices[stopped_triangle_index*3+1], vertices[stopped_triangle_index*3+2] - vertices[stopped_triangle_index*3]));
-
-                                        reaches = false;
-                                        break;
-
-                                    }
-
-                                }
-
-                            }
-
-                        }
-
-                        if (reaches) {
-
-                            glm::vec3 normal = glm::normalize(glm::cross(vertices[stopped_triangle_index*3+1] - vertices[stopped_triangle_index*3], vertices[stopped_triangle_index*3+2] - vertices[stopped_triangle_index*3]));
-                            float dist = glm::length(ttl);
-                            //brightness += glm::dot(normal, ttl_normalized) / (dist*dist);
-
-
-                            std::cout << "a test" << std::endl;
-                        }
-
-                    }
-
-                    //float inv_sqrt = 1.0f / (lowest_dist*lowest_dist);
-
-                    brightness = (brightness > 1.0f) ? 1.0f : brightness;
-
-                    brightness /= lowest_dist*lowest_dist;
-
-                    const unsigned int offset = ( wtw * i * 4 ) + j * 4;
-                    pixels[offset]      = 255 * brightness;
-                    pixels[offset+1]    = 255 * brightness;
-                    pixels[offset+2]    = 255 * brightness;
-                    pixels[offset+3]    = SDL_ALPHA_OPAQUE;
-
-                    // do essentially the same process, but from the position where the ray was stopped, to every light source
+                    pixels[wi*4] = 255;
+                    pixels[wi*4 + 1] = 255;
+                    pixels[wi*4 + 2] = 255;
+                    pixels[wi*4 + 3] = SDL_ALPHA_OPAQUE;
 
                 }
-
-
 
             }
         }
