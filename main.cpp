@@ -9,14 +9,6 @@
 #include <SDL2/SDL.h>
 
 
-struct mesh {
-
-    std::vector<glm::vec3> vertices;
-    std::vector<glm::vec3> normals;
-
-};
-
-
 int main(int, char**){
 
     // window setup
@@ -62,8 +54,6 @@ int main(int, char**){
         normals[i] = glm::normalize(glm::cross(vertices[i*3+1]-vertices[i*3], vertices[i*3+2]-vertices[i*3]));
     }
 
-    mesh m = {vertices, normals};
-
     // light sources
     std::vector<glm::vec3> light_sources = {
         {-1.0f,-1.0f, -1.0f}
@@ -73,7 +63,7 @@ int main(int, char**){
     int max_ray_dist = 100.0f;
     float z0 = 0.5f / glm::tan(fov/2);
 
-    float ambient_light = 0.2f;
+    float ambient_light = 0.0f;
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     
@@ -122,7 +112,7 @@ int main(int, char**){
                         case SDLK_SPACE:
                             p.y -= dt;
                             break;
-                        case SDLK_LSHIFT:
+                        case SDLK_z:
                             p.y += dt;
                             break;
                         
@@ -188,11 +178,13 @@ int main(int, char**){
 
                 if (stopped) {
 
+                    glm::vec3 ray_p = p + lowest_d * ray_norm;
+
                     float brightness = ambient_light;
 
                     for (int li = 0; li < light_sources.size(); li++) {
-                        
-                        glm::vec3 to_ls = (light_sources[li] - p) - (lowest_d * ray_norm);
+
+                        glm::vec3 to_ls = (light_sources[li]) - (ray_p);
                         glm::vec3 to_ls_norm = glm::normalize(to_ls);
 
                         float to_ls_length = glm::length(to_ls);
@@ -206,13 +198,13 @@ int main(int, char**){
 
                             glm::vec3 normal = normals[ti/3];
 
-                            glm::vec3 a = vertices[ti] - p;
-                            glm::vec3 b = vertices[ti+1] - p;
-                            glm::vec3 c = vertices[ti+2] - p;
+                            glm::vec3 a = vertices[ti] - ray_p;
+                            glm::vec3 b = vertices[ti+1] - ray_p;
+                            glm::vec3 c = vertices[ti+2] - ray_p;
 
                             float d = (normal.x*a.x + normal.y*a.y + normal.z*a.z) / (normal.x*to_ls_norm.x + normal.y*to_ls_norm.y + normal.z*to_ls_norm.z);
 
-                            if (d >= 0.0f && d <= glm::length(to_ls)) {
+                            if (d >= 0.2f && d <= glm::length(to_ls)) {
 
                                 glm::vec3 rp = d * to_ls_norm;
 
@@ -226,8 +218,6 @@ int main(int, char**){
 
                                 if (area_sum >= 0.98f && area_sum <= 1.02) {
 
-                                    std::cout << "this is a test" << std::endl;
-
                                     reaches_light = false;
                                     break;
 
@@ -238,7 +228,8 @@ int main(int, char**){
                         }
 
                         if (reaches_light) {
-                            brightness += 1.0f/(to_ls_length*to_ls_length);
+                            brightness = 1.0f;
+                            //brightness += 1.0f/(to_ls_length*to_ls_length);
                         }
 
                     }
