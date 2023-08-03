@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Site BuildName="Linux-g++"
-	BuildStamp="20230801-1025-Experimental"
+	BuildStamp="20230803-1357-Experimental"
 	Name="pop-os"
 	Generator="ctest-3.22.1"
 	CompilerName="/usr/bin/g++"
@@ -21,14 +21,14 @@
 	TotalVirtualMemory="15820"
 	TotalPhysicalMemory="15821"
 	LogicalProcessorsPerPhysical="2"
-	ProcessorClockFrequency="4000"
+	ProcessorClockFrequency="3995.57"
 	>
 	<Testing>
-		<StartDateTime>Aug 01 22:11 CEST</StartDateTime>
-		<StartTestTime>1690920667</StartTestTime>
+		<StartDateTime>Aug 03 15:57 CEST</StartDateTime>
+		<StartTestTime>1691071032</StartTestTime>
 		<TestList/>
-		<EndDateTime>Aug 01 22:11 CEST</EndDateTime>
-		<EndTestTime>1690920667</EndTestTime>
+		<EndDateTime>Aug 03 15:57 CEST</EndDateTime>
+		<EndTestTime>1691071032</EndTestTime>
 		<ElapsedMinutes>0</ElapsedMinutes>
 	</Testing>
 </Site>
